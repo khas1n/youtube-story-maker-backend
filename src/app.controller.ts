@@ -23,9 +23,8 @@ export class AppController {
 
   @Post('/youtube-process')
   async youtubeDownload(@Req() req) {
-    const { url, duration } = req.body;
-    console.log('req.body: ', req.body);
-    await this.youtubeService.downloadYoutube(url, duration);
+    const { url, duration, startTime } = req.body;
+    await this.youtubeService.downloadYoutube(url, duration, startTime);
     return 'success';
   }
 
@@ -43,9 +42,7 @@ export class AppController {
     });
   }
   @Get('/ytubeimg/:url')
-  getImg(@Param('url') url: string, @Res() res, @Req() req) {
-    // const { url } = req.body;
-    // res.send(url);
+  getImg(@Param('url') url: string, @Res() res) {
     const decodeUrl = decodeURIComponent(url);
     console.log('decodeUrl: ', decodeUrl);
     request(

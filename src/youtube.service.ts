@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { format, addSeconds, parse } from 'date-fns';
 import * as readline from 'readline';
 import * as fs from 'fs';
 import * as cp from 'child_process';
@@ -8,10 +9,18 @@ import * as ffmpeg from 'ffmpeg-static';
 
 @Injectable()
 export class YoutubeService {
+  limitSecond = 25;
   constructor(private configService: ConfigService) {}
-  async downloadYoutube(url: string, durationVideo = 15) {
+  async downloadYoutube(
+    url: string,
+    durationVideo = 15,
+    timeStart = '00:01:00',
+  ) {
     console.log('url: ', url);
-    const duration = durationVideo ? durationVideo : 15;
+    const duration =
+      durationVideo && durationVideo > this.limitSecond
+        ? this.limitSecond
+        : durationVideo;
     const videoId = this.getVideoId(url);
     const videoFolder = `${__dirname}/youtube/${videoId}`;
     if (!fs.existsSync(videoFolder)) {
@@ -23,8 +32,14 @@ export class YoutubeService {
     const lengthSecond = Math.floor(+videoDetail.lengthSeconds / 60);
     console.log('videoInfo: ', lengthSecond);
 
-    const timeStart = '00:01:00';
-    const timeDuration = '00:00:' + duration;
+    const dayTime = parse(
+      '2019-11-27 00:00:00',
+      'yyyy-MM-dd HH:mm:ss',
+      new Date(),
+    );
+    const time = addSeconds(dayTime, duration);
+    const timeDuration = format(time, 'HH:mm:ss');
+    console.log('timeDuration: ', timeDuration);
     const tmpOutput = `${videoFolder}/${videoId}_tmp.mp4`;
     const outputTmpFile = `${videoFolder}/${videoId}.mp4`;
     const video = await ytdl(url);
