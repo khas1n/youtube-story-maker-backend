@@ -4,6 +4,7 @@ import { format, addSeconds, parse } from 'date-fns';
 import * as readline from 'readline';
 import * as fs from 'fs';
 import * as cp from 'child_process';
+// import { execa as cp } from 'execa';
 import * as ytdl from 'ytdl-core';
 import * as ffmpeg from 'ffmpeg-static';
 
@@ -22,7 +23,11 @@ export class YoutubeService {
         ? this.limitSecond
         : durationVideo;
     const videoId = this.getVideoId(url);
-    const videoFolder = `${__dirname}/youtube/${videoId}`;
+    const rootYoutubeDir = `${__dirname}/youtube/`;
+    if (!fs.existsSync(rootYoutubeDir)) {
+      fs.mkdirSync(rootYoutubeDir);
+    }
+    const videoFolder = `${rootYoutubeDir}/${videoId}`;
     if (!fs.existsSync(videoFolder)) {
       fs.mkdirSync(videoFolder);
     }
@@ -54,63 +59,67 @@ export class YoutubeService {
     });
     return new Promise((resolve, reject) => {
       video.pipe(fs.createWriteStream(tmpOutput)).on('finish', () => {
-        const ffmpegProcess = cp.spawn(
-          ffmpeg,
-          [
-            '-y',
-            '-v',
-            'error',
-            '-progress',
-            'pipe:3',
-            '-i',
-            tmpOutput,
-            '-vcodec',
-            'copy',
-            '-acodec',
-            'copy',
-            '-ss',
-            timeStart,
-            '-t',
-            timeDuration,
-            '-f',
-            'matroska',
-            'pipe:4',
-          ],
-          {
-            windowsHide: true,
-            stdio: ['inherit', 'inherit', 'inherit', 'pipe', 'pipe'],
-          },
-        );
-
-        process.stdout.write('\n');
-        ffmpegProcess.stdio[3].on('data', (chunk) => {
-          readline.cursorTo(process.stdout, 0);
-          const args = chunk
-            .toString()
-            .trim()
-            .split('\n')
-            .reduce((acc, line) => {
-              const parts = line.split('=');
-              acc[parts[0]] = parts[1];
-              return acc;
-            }, {});
-          process.stdout.write(
-            `cutting video... ${args.progress}${' '.repeat(3)}`,
+        try {
+          const ffmpegProcess = cp.spawn(
+            ffmpeg,
+            [
+              '-y',
+              '-v',
+              'error',
+              '-progress',
+              'pipe:3',
+              '-i',
+              tmpOutput,
+              '-vcodec',
+              'copy',
+              '-acodec',
+              'copy',
+              '-ss',
+              timeStart,
+              '-t',
+              timeDuration,
+              '-f',
+              'matroska',
+              'pipe:4',
+            ],
+            {
+              windowsHide: true,
+              stdio: ['inherit', 'inherit', 'inherit', 'pipe', 'pipe'],
+            },
           );
-        });
 
-        ffmpegProcess.on('close', () => {
-          process.stdout.write(`\nsaved to ${outputTmpFile}\n`);
-          resolve(outputTmpFile);
-          try {
-            fs.unlinkSync(tmpOutput);
-            //file removed
-          } catch (err) {
-            console.error(err);
-          }
-        });
+          process.stdout.write('\n');
+          ffmpegProcess.stdio[3].on('data', (chunk) => {
+            readline.cursorTo(process.stdout, 0);
+            const args = chunk
+              .toString()
+              .trim()
+              .split('\n')
+              .reduce((acc, line) => {
+                const parts = line.split('=');
+                acc[parts[0]] = parts[1];
+                return acc;
+              }, {});
+            process.stdout.write(
+              `cutting video... ${args.progress}${' '.repeat(3)}`,
+            );
+          });
 
-        ffmpegProcess.stdio[4].pipe(fs.createWriteStream(outputTmpFile));
+          ffmpegProcess.on('close', () => {
+            process.stdout.write(`\nsaved to ${outputTmpFile}\n`);
+            resolve(outputTmpFile);
+            try {
+              fs.unlinkSync(tmpOutput);
+              //file removed
+            } catch (err) {
+              console.error(err);
+            }
+          });
+
+          ffmpegProcess.stdio[4].pipe(fs.createWriteStream(outputTmpFile));
+        } catch (error) {
+          console.log(error);
+        }
       });
     });
   }
